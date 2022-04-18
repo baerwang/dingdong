@@ -31,11 +31,6 @@ func main() {
 
 	handle()
 
-	if 1 == 1 {
-		TestTimed()
-		return
-	}
-
 	var (
 		cart, order map[string]interface{}
 		reserve     map[string]int64
