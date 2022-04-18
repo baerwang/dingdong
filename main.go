@@ -31,6 +31,11 @@ func main() {
 
 	handle()
 
+	if 1 == 1 {
+		TestTimed()
+		return
+	}
+
 	var (
 		cart, order map[string]interface{}
 		reserve     map[string]int64
@@ -108,7 +113,7 @@ func main() {
 					storeCart, cok := m.Load("cart")
 					storeReserve, rok := m.Load("reserve")
 					storeOrder, ook := m.Load("order")
-					if cok || rok || ook {
+					if cok && rok && ook {
 						if submitOrder(aid, storeCart.(map[string]interface{}),
 							storeOrder.(map[string]interface{}), storeReserve.(map[string]int64)) {
 							cancel()
