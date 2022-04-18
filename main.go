@@ -428,7 +428,7 @@ func reserveTime(products interface{}, aid string) map[string]int64 {
 			reserved := make(map[string]int64, 3)
 			reserved["reserved_time_start"] = item.StartTimestamp
 			reserved["reserved_time_end"] = item.EndTimestamp
-			log.Println("更新配送时间成功 start ", item.StartTimestamp, " end ", item.EndTimestamp)
+			// log.Println("更新配送时间成功 start ", item.StartTimestamp, " end ", item.EndTimestamp)
 			return reserved
 		}
 	}
@@ -652,7 +652,11 @@ func submitOrder(aid string, cart map[string]interface{}, order map[string]inter
 
 // httpStatus judge http status
 func httpStatus(info map[string]interface{}, str string) bool {
-	if !info["success"].(bool) {
+	data, ok := info["success"].(bool)
+	if !ok {
+		return false
+	}
+	if !data {
 		msg, ok := info["message"].(string)
 		if ok {
 			if "您的访问已过期" == msg {
