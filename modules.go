@@ -1,5 +1,41 @@
 package main
 
+type Info struct {
+	UserInfo struct {
+		Uid          string `yaml:"uid"`
+		Longitude    string `yaml:"longitude"`
+		Latitude     string `yaml:"latitude"`
+		StationId    string `yaml:"station_id"`
+		CityNumber   string `yaml:"city_number"`
+		ApiVersion   string `yaml:"api_version"`
+		AppVersion   string `yaml:"app_version"`
+		AppletSource string `yaml:"applet_source"`
+		Channel      string `yaml:"channel"`
+		AppClientId  string `yaml:"app_client_id"`
+		SharerUid    string `yaml:"sharer_uid"`
+		Openid       string `yaml:"openid"`
+		H5Source     string `yaml:"h_5_source"`
+		DeviceToken  string `yaml:"device_token"`
+	}
+	Headers struct {
+		CityNumber   string `yaml:"ddmc_city_number"`
+		BuildVersion string `yaml:"ddmc_build_version"`
+		DeviceId     string `yaml:"ddmc_device_id"`
+		StationId    string `yaml:"ddmc_station_id"`
+		Channel      string `yaml:"ddmc_channel"`
+		OsVersion    string `yaml:"ddmc_os_version"`
+		AppClientId  string `yaml:"ddmc_app_client_id"`
+		Cookie       string `yaml:"cookie"`
+		Ip           string `yaml:"ddmc_ip"`
+		Longitude    string `yaml:"ddmc_longitude"`
+		Latitude     string `yaml:"ddmc_latitude"`
+		ApiVersion   string `yaml:"ddmc_api_version"`
+		Uid          string `yaml:"ddmc_uid"`
+		UserAgent    string `yaml:"user_agent"`
+		Referer      string `yaml:"referer"`
+	}
+}
+
 type Cart struct {
 	CartCount              int           `json:"cart_count"`
 	IsPresale              int           `json:"is_presale"`

@@ -23,3 +23,12 @@
 ![dingdong_1](images/dingdong1.png)
 
 ![dingdong_2](images/dingdong2.png)
+
+# feature
+1. add run application,run the command as follows
+
+   ./dingdong `-f config.yaml -aid address_id`
+
+   `aid` run is empty,default find address_id
+
+   `f` Add URL query param and header info required information to the configuration file

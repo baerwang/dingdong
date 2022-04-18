@@ -23,3 +23,13 @@
 ![dingdong_1](images/dingdong1.png)
 
 ![dingdong_2](images/dingdong2.png)
+
+# feature
+1. 新增运行程序，运行命令如下
+
+   ./dingdong `-f config.yaml -aid addressid`
+
+   `aid` 运行为空，默认去查找地址id
+   
+   `f` 向配置文件添加 URL query param和header info 需要的信息
+   

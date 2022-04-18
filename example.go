@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func TestApp(t *testing.T) {
+func TestApp() {
 	aid := addressId()
 	cart := carts()
 	if len(cart) == 0 {
@@ -59,9 +59,7 @@ func TestProduct(t *testing.T) {
 	t.Log(data)
 }
 
-func TestTimed(t *testing.T) {
-
-	ticker := time.NewTicker(10 * time.Minute)
+func TestTimed() {
 
 	aid := addressId()
 
@@ -69,6 +67,7 @@ func TestTimed(t *testing.T) {
 		return
 	}
 
+	ticker := time.NewTicker(20 * time.Minute)
 	ch := make(chan struct{})
 
 	go func() {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -14,15 +15,21 @@ import (
 	"time"
 )
 
+import (
+	"gopkg.in/yaml.v3"
+)
+
 var (
-	timeout  = 2 * time.Minute        // app timeout done
-	stopTime = 100 * time.Microsecond // stop a while
+	aid, file string
+	config    Info
+	timeout   = 2 * time.Minute  // app timeout done
+	stopTime  = time.Microsecond // stop a while
+	tr        *http.Transport
 )
 
 func main() {
 
-	// in advance can take out the address id,prevent limiting get fail
-	aid := addressId()
+	handle()
 
 	var (
 		cart, order map[string]interface{}
@@ -53,7 +60,9 @@ func main() {
 		cart = carts()
 		if len(cart) != 0 {
 			m.LoadOrStore("cart", cart)
+			return
 		}
+		sleeps()
 	})
 
 	go execute(notify, func() {
@@ -62,15 +71,24 @@ func main() {
 			reserve = reserveTime(load.(map[string]interface{})["products"], aid)
 			if len(reserve) != 0 {
 				m.LoadOrStore("reserve", reserve)
+				return
 			}
+			sleeps()
 		}
 	})
 
 	go execute(notify, func() {
 		storeCart, ok := m.Load("cart")
 		if ok {
-			storeReserve, _ := m.Load("reserve")
-			order = checkOrder(aid, storeCart.(map[string]interface{}), storeReserve.(map[string]int64))
+			storeReserve, ok := m.Load("reserve")
+			if ok {
+				order = checkOrder(aid, storeCart.(map[string]interface{}), storeReserve.(map[string]int64))
+				if len(order) != 0 {
+					m.LoadOrStore("order", order)
+					return
+				}
+				sleeps()
+			}
 		}
 	})
 
@@ -87,12 +105,19 @@ func main() {
 				return
 			default:
 				go func() {
-					sleeps()
-					if submitOrder(aid, cart, order, reserve) {
-						cancel()
-						notifyCancel()
-						ch <- struct{}{}
-						return
+					storeCart, cok := m.Load("cart")
+					storeReserve, rok := m.Load("reserve")
+					storeOrder, ook := m.Load("order")
+					if cok || rok || ook {
+						if submitOrder(aid, storeCart.(map[string]interface{}),
+							storeOrder.(map[string]interface{}), storeReserve.(map[string]int64)) {
+							cancel()
+							notifyCancel()
+							ch <- struct{}{}
+							return
+						}
+					} else {
+						sleeps()
 					}
 				}()
 			}
@@ -100,6 +125,38 @@ func main() {
 	}()
 
 	<-ch
+
+}
+
+func handle() {
+
+	flag.StringVar(&aid, "aid", "", "address id")
+	flag.StringVar(&file, "f", "", "config need info")
+	flag.Parse()
+
+	if file == "" {
+		panic("config file not null")
+	}
+
+	readFile, err := ioutil.ReadFile(file)
+	if err != nil {
+		panic(err)
+	}
+
+	// 将json解码
+	if err = yaml.Unmarshal(readFile, &config); err != nil {
+		panic(err)
+	}
+
+	// in advance can take out the address id,prevent limiting get fail
+	if aid == "" {
+		if aid = addressId(); aid == "" {
+			panic("find user address id fail")
+		}
+		log.Println("获取收货人信息:" + aid)
+	}
+
+	tr = &http.Transport{MaxIdleConns: 1000, MaxIdleConnsPerHost: 100}
 
 }
 
@@ -111,7 +168,6 @@ func execute(ctx context.Context, task func()) {
 		default:
 			go func() {
 				for i := 0; i < 3; i++ {
-					sleeps()
 					task()
 				}
 			}()
@@ -126,49 +182,49 @@ func sleeps() {
 // userInfo user info
 func userInfo() url.Values {
 	values := url.Values{}
-	values["uid"] = []string{""}
-	values["longitude"] = []string{""}
-	values["latitude"] = []string{""}
-	values["station_id"] = []string{""}
-	values["city_number"] = []string{""}
-	values["api_version"] = []string{""}
-	values["app_version"] = []string{""}
-	values["applet_source"] = []string{""}
-	values["channel"] = []string{""}
-	values["app_client_id"] = []string{""}
-	values["sharer_uid"] = []string{""}
-	values["openid"] = []string{""}
-	values["h5_source"] = []string{""}
-	values["device_token"] = []string{""}
+	values["uid"] = []string{config.UserInfo.Uid}
+	values["longitude"] = []string{config.UserInfo.Longitude}
+	values["latitude"] = []string{config.UserInfo.Latitude}
+	values["station_id"] = []string{config.UserInfo.StationId}
+	values["city_number"] = []string{config.UserInfo.CityNumber}
+	values["api_version"] = []string{config.UserInfo.ApiVersion}
+	values["app_version"] = []string{config.UserInfo.AppVersion}
+	values["applet_source"] = []string{config.UserInfo.AppletSource}
+	values["channel"] = []string{config.UserInfo.Channel}
+	values["app_client_id"] = []string{config.UserInfo.AppClientId}
+	values["sharer_uid"] = []string{config.UserInfo.SharerUid}
+	values["openid"] = []string{config.UserInfo.Openid}
+	values["h5_source"] = []string{config.UserInfo.H5Source}
+	values["device_token"] = []string{config.UserInfo.DeviceToken}
 	return values
 }
 
 // headers http header
 func headers() http.Header {
 	headerMap := map[string][]string{}
-	headerMap["ddmc-city-number"] = []string{""}
-	headerMap["ddmc-build-version"] = []string{""}
-	headerMap["ddmc-device-id"] = []string{""}
-	headerMap["ddmc-station-id"] = []string{""}
-	headerMap["ddmc-channel"] = []string{""}
-	headerMap["ddmc-os-version"] = []string{""}
-	headerMap["ddmc-app-client-id"] = []string{""}
-	headerMap["cookie"] = []string{""}
-	headerMap["ddmc-ip"] = []string{""}
-	headerMap["ddmc-longitude"] = []string{""}
-	headerMap["ddmc-latitude"] = []string{""}
-	headerMap["ddmc-api-version"] = []string{""}
-	headerMap["ddmc-uid"] = []string{""}
-	headerMap["user-agent"] = []string{"Mozilla/5.0 (iPhone; CPU iPhone OS 15_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 MicroMessenger/8.0.18(0x1800123c) NetType/WIFI Language/zh_CN"}
-	headerMap["referer"] = []string{"https://servicewechat.com/wx1e113254eda17715/422/page-frame.html"}
+	headerMap["ddmc-city-number"] = []string{config.Headers.CityNumber}
+	headerMap["ddmc-build-version"] = []string{config.Headers.BuildVersion}
+	headerMap["ddmc-device-id"] = []string{config.Headers.DeviceId}
+	headerMap["ddmc-station-id"] = []string{config.Headers.StationId}
+	headerMap["ddmc-channel"] = []string{config.Headers.Channel}
+	headerMap["ddmc-os-version"] = []string{config.Headers.OsVersion}
+	headerMap["ddmc-app-client-id"] = []string{config.Headers.AppClientId}
+	headerMap["cookie"] = []string{config.Headers.Cookie}
+	headerMap["ddmc-ip"] = []string{config.Headers.Ip}
+	headerMap["ddmc-longitude"] = []string{config.Headers.Longitude}
+	headerMap["ddmc-latitude"] = []string{config.Headers.Latitude}
+	headerMap["ddmc-api-version"] = []string{config.Headers.ApiVersion}
+	headerMap["ddmc-uid"] = []string{config.Headers.Uid}
+	headerMap["user-agent"] = []string{config.Headers.UserAgent}
+	headerMap["referer"] = []string{config.Headers.Referer}
 	return headerMap
 }
 
-// addressId get user address id `must choose the default`
+// addressId get user address id `input choose the default`
 func addressId() string {
 	const _url = "https://sunquan.api.ddxq.mobi/api/v1/user/address/"
 
-	client := http.Client{Timeout: 5 * time.Second}
+	client := http.Client{Timeout: 5 * time.Second, Transport: tr}
 	request, _ := http.NewRequest(http.MethodGet, _url, nil)
 	request.Header = headers()
 
@@ -221,7 +277,7 @@ func addressId() string {
 
 func carts() map[string]interface{} {
 	const _url = "https://maicai.api.ddxq.mobi/cart/index"
-	client := http.Client{Timeout: 5 * time.Second}
+	client := http.Client{Timeout: 5 * time.Second, Transport: tr}
 	request, _ := http.NewRequest(http.MethodGet, _url, nil)
 	request.Header = headers()
 	user := userInfo()
@@ -230,7 +286,7 @@ func carts() map[string]interface{} {
 
 	do, err := client.Do(request)
 	if err != nil {
-		log.Println(err)
+		// log.Println(err)
 		return nil
 	}
 	defer do.Body.Close()
@@ -327,10 +383,8 @@ func reserveTime(products interface{}, aid string) map[string]int64 {
 		return nil
 	}
 
-	log.Println("获取收货人信息:" + aid)
-
 	marshal, _ := json.Marshal(products)
-	client := http.Client{Timeout: time.Second * 5}
+	client := http.Client{Timeout: time.Second * 5, Transport: tr}
 
 	user := userInfo()
 	user["addressId"] = []string{aid}
@@ -448,10 +502,10 @@ func checkOrder(aid string, cart map[string]interface{}, reserve map[string]int6
 	req.Header = header
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded;UTF-8")
 
-	client := http.Client{Timeout: 5 * time.Second}
+	client := http.Client{Timeout: 5 * time.Second, Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println(err)
+		// log.Println(err)
 		return nil
 	}
 	defer resp.Body.Close()
@@ -562,10 +616,10 @@ func submitOrder(aid string, cart map[string]interface{}, order map[string]inter
 	header["Content-Type"] = []string{"application/x-www-form-urlencoded;UTF-8"}
 	req.Header = header
 
-	client := http.Client{Timeout: time.Second * 5}
+	client := http.Client{Timeout: time.Second * 5, Transport: tr}
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Println(err)
+		// log.Println(err)
 		return false
 	}
 	defer resp.Body.Close()
@@ -585,9 +639,9 @@ func submitOrder(aid string, cart map[string]interface{}, order map[string]inter
 		return false
 	}
 
-	data, ok := rest["pay_url"]
+	payUrl, ok := rest["pay_url"]
 	if ok {
-		if len(data.(string)) != 0 {
+		if len(payUrl.(string)) != 0 {
 			log.Println("成功下单 当前下单总金额：", cart["total_money"])
 			return true
 		}
