@@ -18,12 +18,6 @@
 5. start `go run .`
 6. 下单成功自行支付，让我们祝疫情早日结束 🍻！！
 
-# 实战
-
-![dingdong_1](images/dingdong1.png)
-
-![dingdong_2](images/dingdong2.png)
-
 # feature
 1. 新增运行程序，运行命令如下
 
@@ -40,3 +34,9 @@
    (2) 14:30-22:00
 
    `reserve` 运行为空，默认是1
+
+# 实战
+
+![dingdong_1](images/dingdong1.png)
+
+![dingdong_2](images/dingdong2.png)

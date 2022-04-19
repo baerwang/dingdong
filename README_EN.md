@@ -18,12 +18,6 @@
 5. start `go run .`
 6. order success need own pay, Let's wish the epidemic will end soon 🍻！！
 
-# actual combat
-
-![dingdong_1](images/dingdong1.png)
-
-![dingdong_2](images/dingdong2.png)
-
 # feature
 1. add run application,run the command as follows
 
@@ -40,3 +34,9 @@
    (2) 14:30-22:00
 
    `reserve` runs empty, default is 1
+
+# actual combat
+
+![dingdong_1](images/dingdong1.png)
+
+![dingdong_2](images/dingdong2.png)
