@@ -21,6 +21,7 @@ import (
 
 var (
 	aid, file string
+	reserve   int
 	config    Info
 	timeout   = 2 * time.Minute  // app timeout done
 	stopTime  = time.Microsecond // stop a while
@@ -33,7 +34,6 @@ func main() {
 
 	var (
 		cart, order map[string]interface{}
-		reserve     map[string]int64
 		m           sync.Map
 	)
 
@@ -41,17 +41,13 @@ func main() {
 
 	if len(cart) != 0 {
 		m.LoadOrStore("cart", cart)
-		reserve = reserveTime(cart["products"], aid)
-	}
-
-	if len(reserve) != 0 {
-		m.LoadOrStore("reserve", reserve)
-		order = checkOrder(aid, cart, reserve)
 	}
 
 	if len(order) != 0 {
 		m.LoadOrStore("order", order)
 	}
+
+	reserveMap := customizeReserve()
 
 	notify, notifyCancel := context.WithTimeout(context.Background(), timeout)
 	defer notifyCancel()
@@ -66,29 +62,14 @@ func main() {
 	})
 
 	go execute(notify, func() {
-		load, ok := m.Load("cart")
+		storeCart, ok := m.Load("cart")
 		if ok {
-			reserve = reserveTime(load.(map[string]interface{})["products"], aid)
-			if len(reserve) != 0 {
-				m.LoadOrStore("reserve", reserve)
+			order = checkOrder(aid, storeCart.(map[string]interface{}), reserveMap)
+			if len(order) != 0 {
+				m.LoadOrStore("order", order)
 				return
 			}
 			sleeps()
-		}
-	})
-
-	go execute(notify, func() {
-		storeCart, ok := m.Load("cart")
-		if ok {
-			storeReserve, ok := m.Load("reserve")
-			if ok {
-				order = checkOrder(aid, storeCart.(map[string]interface{}), storeReserve.(map[string]int64))
-				if len(order) != 0 {
-					m.LoadOrStore("order", order)
-					return
-				}
-				sleeps()
-			}
 		}
 	})
 
@@ -106,11 +87,10 @@ func main() {
 			default:
 				go func() {
 					storeCart, cok := m.Load("cart")
-					storeReserve, rok := m.Load("reserve")
 					storeOrder, ook := m.Load("order")
-					if cok && rok && ook {
+					if cok && ook {
 						if submitOrder(aid, storeCart.(map[string]interface{}),
-							storeOrder.(map[string]interface{}), storeReserve.(map[string]int64)) {
+							storeOrder.(map[string]interface{}), reserveMap) {
 							cancel()
 							notifyCancel()
 							ch <- struct{}{}
@@ -132,6 +112,7 @@ func handle() {
 
 	flag.StringVar(&aid, "aid", "", "address id")
 	flag.StringVar(&file, "f", "", "config need info")
+	flag.IntVar(&reserve, "reserve", 1, "reserve Time")
 	flag.Parse()
 
 	if file == "" {
@@ -375,6 +356,21 @@ func carts() map[string]interface{} {
 	rst["front_package_stock_color"] = cart.FrontPackageStockColor
 	rst["front_package_bg_color"] = cart.FrontPackageBgColor
 	return rst
+}
+
+func customizeReserve() map[string]int64 {
+	switch reserve {
+	case 2:
+		return map[string]int64{"reserved_time_start": unix(6, 30), "reserved_time_end": unix(14, 30)}
+	default:
+		return map[string]int64{"reserved_time_start": unix(14, 30), "reserved_time_end": unix(22, 30)}
+	}
+}
+
+func unix(hour, min int) int64 {
+	now := time.Now()
+	parse, _ := time.Parse("2006-01-02 15:04:05", time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.Local).String())
+	return parse.Unix()
 }
 
 func reserveTime(products interface{}, aid string) map[string]int64 {

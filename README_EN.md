@@ -32,3 +32,11 @@
    `aid` run is empty,default find address_id
 
    `f` Add URL query param and header info required information to the configuration file
+   
+2. customize the scheduled time to grab the order
+
+   (1) 6:30-14:30
+   
+   (2) 14:30-22:00
+
+   `reserve` runs empty, default is 1
