@@ -127,6 +127,8 @@ func handle() {
 		panic(err)
 	}
 
+	tr = &http.Transport{MaxIdleConns: 1000, MaxIdleConnsPerHost: 100}
+
 	// in advance can take out the address id,prevent limiting get fail
 	if aid == "" {
 		if aid = addressId(); aid == "" {
@@ -134,8 +136,6 @@ func handle() {
 		}
 		log.Println("获取收货人信息:" + aid)
 	}
-
-	tr = &http.Transport{MaxIdleConns: 1000, MaxIdleConnsPerHost: 100}
 
 }
 
