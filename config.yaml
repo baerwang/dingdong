@@ -13,6 +13,7 @@ userinfo:
   openid: ""
   h_5_source: ""
   device_token: ""
+  s_id: ""
 
 headers:
   ddmc_city_number: ""

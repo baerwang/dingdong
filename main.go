@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -32,19 +31,18 @@ func main() {
 
 	handle()
 
-	var (
-		cart, order map[string]interface{}
-		m           sync.Map
-	)
+	var cart, order map[string]interface{}
+
+	m := NewConcurrentMap()
 
 	cart = carts()
 
 	if len(cart) != 0 {
-		m.LoadOrStore("cart", cart)
+		m.Set("cart", cart)
 	}
 
 	if len(order) != 0 {
-		m.LoadOrStore("order", order)
+		m.Set("order", order)
 	}
 
 	reserveMap := customizeReserve()
@@ -55,18 +53,18 @@ func main() {
 	go execute(notify, func() {
 		cart = carts()
 		if len(cart) != 0 {
-			m.LoadOrStore("cart", cart)
+			m.Set("cart", cart)
 			return
 		}
 		sleeps()
 	})
 
 	go execute(notify, func() {
-		storeCart, ok := m.Load("cart")
+		storeCart, ok := m.Get("cart")
 		if ok {
 			order = checkOrder(aid, storeCart.(map[string]interface{}), reserveMap)
 			if len(order) != 0 {
-				m.LoadOrStore("order", order)
+				m.Set("order", order)
 				return
 			}
 			sleeps()
@@ -86,8 +84,8 @@ func main() {
 				return
 			default:
 				go func() {
-					storeCart, cok := m.Load("cart")
-					storeOrder, ook := m.Load("order")
+					storeCart, cok := m.Get("cart")
+					storeOrder, ook := m.Get("order")
 					if cok && ook {
 						if submitOrder(aid, storeCart.(map[string]interface{}),
 							storeOrder.(map[string]interface{}), reserveMap) {
@@ -176,6 +174,7 @@ func userInfo() url.Values {
 	values["sharer_uid"] = []string{config.UserInfo.SharerUid}
 	values["openid"] = []string{config.UserInfo.Openid}
 	values["h5_source"] = []string{config.UserInfo.H5Source}
+	values["s_id"] = []string{config.UserInfo.Sid}
 	values["device_token"] = []string{config.UserInfo.DeviceToken}
 	return values
 }
@@ -184,6 +183,7 @@ func userInfo() url.Values {
 func headers() http.Header {
 	headerMap := map[string][]string{}
 	headerMap["ddmc-city-number"] = []string{config.Headers.CityNumber}
+	headerMap["ddmc-time"] = []string{fmt.Sprint(time.Now().Unix())}
 	headerMap["ddmc-build-version"] = []string{config.Headers.BuildVersion}
 	headerMap["ddmc-device-id"] = []string{config.Headers.DeviceId}
 	headerMap["ddmc-station-id"] = []string{config.Headers.StationId}
@@ -245,9 +245,9 @@ func addressId() string {
 	}
 
 	for _, m := range infos {
-		flag, ok := m["is_default"]
+		isDefault, ok := m["is_default"].(bool)
 		if ok {
-			if flag.(bool) {
+			if isDefault {
 				return m["id"].(string)
 			}
 		}
@@ -361,9 +361,9 @@ func carts() map[string]interface{} {
 func customizeReserve() map[string]int64 {
 	switch reserve {
 	case 2:
-		return map[string]int64{"reserved_time_start": unix(6, 30), "reserved_time_end": unix(14, 30)}
-	default:
 		return map[string]int64{"reserved_time_start": unix(14, 30), "reserved_time_end": unix(22, 30)}
+	default:
+		return map[string]int64{"reserved_time_start": unix(6, 30), "reserved_time_end": unix(14, 30)}
 	}
 }
 

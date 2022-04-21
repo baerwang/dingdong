@@ -15,6 +15,7 @@ type Info struct {
 		SharerUid    string `yaml:"sharer_uid"`
 		Openid       string `yaml:"openid"`
 		H5Source     string `yaml:"h_5_source"`
+		Sid          string `yaml:"s_id"`
 		DeviceToken  string `yaml:"device_token"`
 	}
 	Headers struct {
