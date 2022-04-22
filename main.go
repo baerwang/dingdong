@@ -23,7 +23,7 @@ var (
 	reserve   int
 	config    Info
 	timeout   = 2 * time.Minute  // app timeout done
-	stopTime  = time.Microsecond // stop a while
+	stopTime  = time.Millisecond // stop a while
 	tr        *http.Transport
 )
 
@@ -31,27 +31,13 @@ func main() {
 
 	handle()
 
-	var cart, order map[string]interface{}
-
 	m := NewConcurrentMap()
-
-	cart = carts()
-
-	if len(cart) != 0 {
-		m.Set("cart", cart)
-	}
-
-	if len(order) != 0 {
-		m.Set("order", order)
-	}
-
-	reserveMap := customizeReserve()
 
 	notify, notifyCancel := context.WithTimeout(context.Background(), timeout)
 	defer notifyCancel()
 
 	go execute(notify, func() {
-		cart = carts()
+		cart := carts()
 		if len(cart) != 0 {
 			m.Set("cart", cart)
 			return
@@ -59,10 +45,12 @@ func main() {
 		sleeps()
 	})
 
+	reserveMap := customizeReserve()
+
 	go execute(notify, func() {
 		storeCart, ok := m.Get("cart")
 		if ok {
-			order = checkOrder(aid, storeCart.(map[string]interface{}), reserveMap)
+			order := checkOrder(aid, storeCart.(map[string]interface{}), reserveMap)
 			if len(order) != 0 {
 				m.Set("order", order)
 				return
@@ -363,14 +351,13 @@ func customizeReserve() map[string]int64 {
 	case 2:
 		return map[string]int64{"reserved_time_start": unix(14, 30), "reserved_time_end": unix(22, 30)}
 	default:
-		return map[string]int64{"reserved_time_start": unix(6, 30), "reserved_time_end": unix(14, 30)}
+		return map[string]int64{"reserved_time_start": unix(06, 30), "reserved_time_end": unix(14, 30)}
 	}
 }
 
 func unix(hour, min int) int64 {
 	now := time.Now()
-	parse, _ := time.Parse("2006-01-02 15:04:05", time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.Local).String())
-	return parse.Unix()
+	return time.Date(now.Year(), now.Month(), now.Day(), hour, min, 0, 0, time.Local).Unix()
 }
 
 func reserveTime(products interface{}, aid string) map[string]int64 {
@@ -382,16 +369,20 @@ func reserveTime(products interface{}, aid string) map[string]int64 {
 	marshal, _ := json.Marshal(products)
 	client := http.Client{Timeout: time.Second * 5, Transport: tr}
 
+	header := headers()
+
 	user := userInfo()
-	user["addressId"] = []string{aid}
+	user["address_id"] = []string{aid}
 	user["products"] = []string{fmt.Sprintf("[%s]", string(marshal))}
 	user["group_config_id"] = []string{""}
 	user["isBridge"] = []string{"false"}
+	user["isBridge"] = []string{"false"}
+	user["time"] = header["ddmc-time"]
+
 	const _url = "https://maicai.api.ddxq.mobi/order/getMultiReserveTime"
 	req, _ := http.NewRequest(http.MethodPost, _url, strings.NewReader(user.Encode()))
-	m := headers()
-	m["Content-Type"] = []string{"application/x-www-form-urlencoded"}
-	req.Header = m
+	req.Header = header
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -652,18 +643,22 @@ func httpStatus(info map[string]interface{}, str string) bool {
 	if !ok {
 		return false
 	}
-	if !data {
-		msg, ok := info["message"].(string)
-		if ok {
-			if "您的访问已过期" == msg {
-				log.Println("用户信息失效")
-			}
-		} else {
-			log.Println(str, "失败:", info["msg"])
-		}
-		return false
+	if data {
+		return true
 	}
-	return true
+	msg, ok := info["message"].(string)
+	if ok {
+		if "您的访问已过期" == msg {
+			log.Println("用户信息失效")
+		}
+	}
+	msg, ok = info["msg"].(string)
+	if ok && msg != "" {
+		log.Println(str, "失败:", msg)
+	} else {
+		log.Println(str, "失败:", info["tips"])
+	}
+	return false
 }
 
 // parseRest parse result data
